@@ -264,3 +264,5 @@ class DeepfakeDetector:
                 "is_fake": False,
                 "confidence": 0.3
             }
+
+deepfake_detector = DeepfakeDetector()

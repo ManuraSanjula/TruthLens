@@ -139,3 +139,4 @@ Content-Type: application/json
 
 ###
 
+GET http://localhost:8000/api/v1/content/status/68050e4982a58b1c35ee06e7

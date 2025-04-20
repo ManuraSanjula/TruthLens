@@ -9,7 +9,6 @@ from app.models.result import Result, DetectionType
 from app.utils.config import settings
 import logging
 import torch
-from sklearn.feature_extraction.text import TfidfVectorizer
 import joblib
 
 logger = logging.getLogger(__name__)

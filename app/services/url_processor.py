@@ -2,23 +2,25 @@ import requests
 from bs4 import BeautifulSoup
 from urllib.parse import urlparse
 from app.services.fake_news_detector import analyze_text_content
-from app.utils import logger
+import logging
 import re
-
+logger = logging.getLogger(__name__)
 
 class URLProcessor:
     def __init__(self):
         self.user_agent = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
 
-    async def process_url(self, url: str) -> dict:
+    async def process_url(self, url: str, content_id: str) -> dict:
         """Extract and analyze content from URL"""
         try:
+            url_str = str(url)
+
             # 1. Validate URL
-            if not self._is_valid_url(url):
+            if not self._is_valid_url(url_str):
                 return {"error": "Invalid URL"}
 
             # 2. Fetch URL content
-            content = await self._fetch_url_content(url)
+            content = await self._fetch_url_content(url_str)
             if not content:
                 return {"error": "Failed to fetch URL content"}
 
@@ -28,9 +30,9 @@ class URLProcessor:
             # 4. Analyze text
             return {
                 "url": url,
-                "domain": urlparse(url).netloc,
+                "domain": urlparse(url_str).netloc,
                 "content": text_content,
-                "analysis": await analyze_text_content(text_content)
+                "analysis": await analyze_text_content(content_id,text_content)
             }
         except Exception as e:
             logger.error(f"URL processing failed: {e}")
@@ -82,3 +84,5 @@ class URLProcessor:
         except Exception as e:
             logger.warning(f"Content extraction failed: {e}")
             return ""
+
+url_processor = URLProcessor()
