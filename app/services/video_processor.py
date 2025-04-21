@@ -20,32 +20,55 @@ class VideoProcessor:
         try:
             # Step 1: Extract key frames
             frames = await self._extract_key_frames(video_path)
+            if not frames:
+                logger.warning(f"No frames extracted from video {video_path}")
+                return [self._create_error_result(content_id, "No frames could be extracted from the video")]
 
             # Step 2: Process frames in parallel
-            loop = asyncio.get_event_loop()
-            frame_results = await asyncio.gather(*[
-                loop.run_in_executor(
-                    self.executor,
-                    self._process_frame,
-                    frame,
-                    i,
-                    len(frames))
-                for i, frame in enumerate(frames)
-            ])
+            frame_results = []
+            for i, frame in enumerate(frames):
+                try:
+                    # Process each frame in the thread pool
+                    result = await asyncio.get_event_loop().run_in_executor(
+                        self.executor,
+                        self._process_frame_sync,  # Using sync version
+                        frame,
+                        i,
+                        len(frames))
+                    frame_results.append(result)
+                except Exception as e:
+                    logger.error(f"Frame {i} processing failed: {e}")
+                    frame_results.append({
+                        "frame_num": i,
+                        "error": str(e)
+                    })
 
             # Step 3: Aggregate results
             return await self._generate_final_results(frame_results, content_id)
 
         except Exception as e:
             logger.error(f"Video processing failed: {e}")
-            raise
+            return [self._create_error_result(content_id, f"Video processing failed: {str(e)}")]
 
     async def _extract_key_frames(self, video_path: str, num_frames: int = 10) -> List[np.ndarray]:
         """Extract representative frames from video"""
         try:
+            if not os.path.exists(video_path):
+                logger.error(f"Video file not found: {video_path}")
+                return []
+
             cap = cv2.VideoCapture(video_path)
+            if not cap.isOpened():
+                logger.error(f"Could not open video file: {video_path}")
+                return []
+
             total_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
-            frame_indices = np.linspace(0, total_frames - 1, num_frames, dtype=int)
+            if total_frames == 0:
+                logger.error(f"Video has no frames: {video_path}")
+                cap.release()
+                return []
+
+            frame_indices = np.linspace(0, total_frames - 1, min(num_frames, total_frames), dtype=int)
 
             frames = []
             for idx in frame_indices:
@@ -53,23 +76,43 @@ class VideoProcessor:
                 ret, frame = cap.read()
                 if ret:
                     frames.append(cv2.cvtColor(frame, cv2.COLOR_BGR2RGB))
+                else:
+                    logger.warning(f"Failed to read frame {idx} from video {video_path}")
 
             cap.release()
+
+            if not frames:
+                logger.error(f"No frames could be read from video {video_path}")
+
             return frames
         except Exception as e:
             logger.error(f"Frame extraction failed: {e}")
-            raise
+            return []
 
-    def _process_frame(self, frame: np.ndarray, frame_num: int, total_frames: int) -> Dict:
-        """Process individual frame (runs in thread pool)"""
+    def _process_frame_sync(self, frame: np.ndarray, frame_num: int, total_frames: int) -> Dict:
+        """Synchronous version of frame processing for thread pool"""
         try:
+            # Create temp directory if it doesn't exist
+            os.makedirs(settings.MEDIA_STORAGE_PATH, exist_ok=True)
+
             # Save temporary frame for analysis
             frame_path = os.path.join(settings.MEDIA_STORAGE_PATH, f"frame_{frame_num}.jpg")
             cv2.imwrite(frame_path, cv2.cvtColor(frame, cv2.COLOR_RGB2BGR))
 
-            # Analyze frame
-            result = self.detector.analyze_image(frame_path)
-            os.remove(frame_path)
+            # Analyze frame - using synchronous version or running coroutine in event loop
+            loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(loop)
+            try:
+                result = loop.run_until_complete(
+                    self.detector.analyze_image(frame_path))
+            finally:
+                loop.close()
+
+            # Clean up
+            try:
+                os.remove(frame_path)
+            except Exception as e:
+                logger.warning(f"Could not remove temp frame {frame_path}: {e}")
 
             return {
                 "frame_num": frame_num,
@@ -87,10 +130,11 @@ class VideoProcessor:
 
     async def _generate_final_results(self, frame_results: List[Dict], content_id: str) -> List[Result]:
         """Generate final results from frame analyses"""
-        valid_results = [r for r in frame_results if "error" not in r]
+        valid_results = [r for r in frame_results if "error" not in r and isinstance(r, dict)]
 
         if not valid_results:
-            raise Exception("No valid frames processed")
+            logger.error("No valid frames processed - all frames failed analysis")
+            return [self._create_error_result(content_id, "All frame analyses failed")]
 
         # Calculate aggregate confidence
         avg_confidence = sum(r["confidence"] for r in valid_results) / len(valid_results)
@@ -102,12 +146,24 @@ class VideoProcessor:
             detection_type="deepfake",
             is_fake=is_fake,
             confidence=avg_confidence,
-            explanation=f"Analyzed {len(valid_results)} frames. {sum(r['is_fake'] for r in valid_results)} frames detected as fake.",
+            explanation=f"Analyzed {len(valid_results)}/{len(frame_results)} frames. {sum(r['is_fake'] for r in valid_results)} frames detected as fake.",
             model_used="CNN+ELA",
             model_version="1.0"
         )
 
         return [main_result]
+
+    def _create_error_result(self, content_id: str, error_msg: str) -> Result:
+        """Create an error result for when processing fails"""
+        return Result(
+            content_id=content_id,
+            detection_type="deepfake",
+            is_fake=False,
+            confidence=0.0,
+            explanation=error_msg,
+            model_used="error_handling",
+            model_version="1.0"
+        )
 
 
 video_processor = VideoProcessor()

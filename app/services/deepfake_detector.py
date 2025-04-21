@@ -90,17 +90,27 @@ class DeepfakeDetector:
         try:
             # 1. Basic image validation
             if not self._validate_image(image_path):
-                return {"error": "Invalid image file"}
+                return {
+                    "is_fake": False,
+                    "confidence": 0.3,
+                    "model_used": "Validation",
+                    "details": {"error": "Invalid image file"}
+                }
 
             # 2. Face detection
             faces = self._detect_faces(image_path)
             if not faces:
-                return {"is_fake": False, "confidence": 0.3, "reason": "No faces detected"}
+                return {
+                    "is_fake": False,
+                    "confidence": 0.3,
+                    "model_used": "FaceDetection",
+                    "details": {"reason": "No faces detected"}
+                }
 
             # 3. Deepfake prediction
             img = self._preprocess_image(image_path)
             try:
-                prediction = self.model.predict(np.expand_dims(img, axis=0))[0][0]
+                prediction = float(self.model.predict(np.expand_dims(img, axis=0))[0][0])
             except Exception as e:
                 logger.error(f"Prediction failed: {e}")
                 prediction = 0.5  # Default to uncertain
@@ -111,24 +121,23 @@ class DeepfakeDetector:
             # 5. Hash analysis
             hash_result = self._hash_analysis(image_path)
 
-            # Combine results
-            is_fake = prediction > 0.7 or ela_result["is_manipulated"]
-            confidence = max(prediction, ela_result["confidence"])
+            # Combine results safely
+            is_fake = bool(prediction > 0.7) or bool(ela_result["is_manipulated"])
+            confidence = float(max(prediction, ela_result["confidence"]))
 
             return {
-                "is_fake": bool(is_fake),
-                "confidence": float(confidence),
+                "is_fake": is_fake,
+                "confidence": confidence,
                 "model_used": "CNN+ELA",
                 "details": {
                     "faces_detected": len(faces),
-                    "deepfake_score": float(prediction),
+                    "deepfake_score": prediction,
                     "ela_result": ela_result,
                     "hash_match": hash_result
                 }
             }
         except Exception as e:
             logger.error(f"Image analysis failed: {e}")
-            # Fallback to basic result if analysis fails
             return {
                 "is_fake": False,
                 "confidence": 0.3,
@@ -148,19 +157,30 @@ class DeepfakeDetector:
             return False
 
     def _detect_faces(self, image_path: str) -> list:
-        """Detect faces in image using OpenCV"""
+        """Detect faces in image using OpenCV with better error handling"""
         try:
             img = cv2.imread(image_path)
+            if img is None:
+                raise ValueError("Could not read image")
+
             gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
-            return self.face_cascade.detectMultiScale(gray, 1.1, 4)
+            faces = self.face_cascade.detectMultiScale(gray, 1.1, 4)
+            return [] if faces is None else faces.tolist()  # Ensure we return a list
         except Exception as e:
             logger.warning(f"Face detection failed: {e}")
             return []
 
     def _preprocess_image(self, image_path: str) -> np.ndarray:
-        """Prepare image for model prediction"""
-        img = Image.open(image_path).resize((256, 256))
-        return np.array(img) / 255.0
+        """Prepare image for model prediction with better type safety"""
+        try:
+            img = Image.open(image_path).resize((256, 256))
+            arr = np.array(img)
+            if arr.dtype != np.float32:
+                arr = arr.astype(np.float32) / 255.0
+            return arr
+        except Exception as e:
+            logger.error(f"Image preprocessing failed: {e}")
+            return np.zeros((256, 256, 3), dtype=np.float32)  # Return blank image
 
     def _perform_ela(self, image_path: str, quality: int = 90) -> dict:
         """Error Level Analysis for image forensics"""
@@ -172,12 +192,13 @@ class DeepfakeDetector:
             compressed = Image.open(temp_path)
 
             ela_image = np.abs(np.array(original) - np.array(compressed))
-            mean_diff = np.mean(ela_image)
+            # Ensure we get a single mean value
+            mean_diff = float(np.mean(ela_image))  # Explicitly convert to float
 
             return {
                 "is_manipulated": mean_diff > self.ela_threshold,
                 "confidence": min(0.9, mean_diff / 20),
-                "mean_difference": float(mean_diff)
+                "mean_difference": mean_diff
             }
         except Exception as e:
             logger.warning(f"ELA analysis failed: {e}")

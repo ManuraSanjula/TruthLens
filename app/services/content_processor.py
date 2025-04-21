@@ -55,20 +55,6 @@ async def _process_text_content(content: Content) -> list[Result]:
     )]
 
 
-# async def _process_url_content(content: Content) -> list[Result]:
-#     """Direct URL processing"""
-#     extracted = await url_processor.process_url(content.source_url)
-#     analysis = await fake_news_detector.analyze_text(extracted["content"])
-#     return [Result(
-#         content_id=str(content.id),
-#         detection_type="fake_news",
-#         is_fake=analysis["is_fake"],
-#         confidence=analysis["confidence"],
-#         explanation=f"URL analysis: {analysis.get('details', '')}",
-#         model_used=f"URL+{analysis['model_used']}",
-#         model_version="1.0"
-#     )]
-
 
 async def _process_url_content(content: Content, content_id: str) -> list[Result]:
     """Direct URL processing"""
@@ -128,18 +114,35 @@ async def _process_url_content(content: Content, content_id: str) -> list[Result
             model_version="1.0"
         )]
 
+
 async def _process_image_content(content: Content) -> list[Result]:
-    """Direct image processing"""
-    analysis = await deepfake_detector.analyze_image(content.file_path)
-    return [Result(
-        content_id=str(content.id),
-        detection_type="image_manipulation",
-        is_fake=analysis["is_fake"],
-        confidence=analysis["confidence"],
-        explanation=str(analysis.get("details", "")),
-        model_used=analysis["model_used"],
-        model_version="1.0"
-    )]
+    try:
+        analysis = await deepfake_detector.analyze_image(content.file_path)
+        print(analysis)
+        # Ensure required fields exist
+        model_used = analysis.get("model_used", "unknown_model")
+        explanation = str(analysis.get("details", ""))
+
+        return [Result(
+            content_id=str(content.id),
+            detection_type="image_manipulation",
+            is_fake=analysis.get("is_fake", False),
+            confidence=analysis.get("confidence", 0.0),
+            explanation=explanation,
+            model_used=model_used,
+            model_version="1.0"
+        )]
+    except Exception as e:
+        logger.error(f"Image processing failed: {e}")
+        return [Result(
+            content_id=str(content.id),
+            detection_type="image_manipulation",
+            is_fake=False,
+            confidence=0.0,
+            explanation=f"Processing error: {str(e)}",
+            model_used="error_handling",
+            model_version="1.0"
+        )]
 
 
 async def _process_video_content(content: Content) -> list[Result]:
