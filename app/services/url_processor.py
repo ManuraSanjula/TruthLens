@@ -1,7 +1,7 @@
 import requests
 from bs4 import BeautifulSoup
 from urllib.parse import urlparse
-from app.services.fake_news_detector import analyze_text_content
+
 import logging
 import re
 logger = logging.getLogger(__name__)
@@ -26,13 +26,13 @@ class URLProcessor:
 
             # 3. Extract main text content
             text_content = self._extract_main_content(content)
-
+            print(text_content)
             # 4. Analyze text
             return {
                 "url": url,
                 "domain": urlparse(url_str).netloc,
                 "content": text_content,
-                "analysis": await analyze_text_content(content_id,text_content)
+                # "analysis": await fake_news_detector.analyze_text(text_content, url_str)
             }
         except Exception as e:
             logger.error(f"URL processing failed: {e}")

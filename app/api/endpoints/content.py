@@ -1,6 +1,5 @@
 import asyncio
 from typing import Optional
-
 from fastapi import APIRouter, UploadFile, File, Form, HTTPException
 from app.services.content_processor import process_content
 from app.models import Content, ContentCreate, ContentType
@@ -16,7 +15,7 @@ async def submit_content(
     source_url: Optional[str] = Form(None),
     raw_text: Optional[str] = Form(None),
     file: Optional[UploadFile] = File(None),
-    user_id: str = Form(...)
+    user_id: str = Form(...),
 ):
     try:
         # Validate URL format if provided

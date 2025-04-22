@@ -1,7 +1,7 @@
 from app.models import Result, Content, ContentStatus, ContentType
-from app.services.fake_news_detector import fake_news_detector
+from app.services.new.fake_news_detector import fake_news_detector
 from app.services.url_processor import url_processor
-from app.services.deepfake_detector import deepfake_detector
+from app.services.new.v1.deepfake_detector import deepfake_detector
 from app.services.video_processor import video_processor
 import logging
 
@@ -44,17 +44,20 @@ async def process_content(content_id: str):
 async def _process_text_content(content: Content) -> list[Result]:
     """Direct text processing"""
     analysis = await fake_news_detector.analyze_text(content.raw_text)
+    # Convert explanation to string if it's a dictionary
+    explanation = analysis.get("details", "")
+    if isinstance(explanation, dict):
+        explanation = str(explanation)  # or format it more nicely if needed
+
     return [Result(
         content_id=str(content.id),
         detection_type="fake_news",
         is_fake=analysis["is_fake"],
         confidence=analysis["confidence"],
-        explanation=analysis.get("details", ""),
+        explanation=explanation,
         model_used=analysis["model_used"],
         model_version="1.0"
     )]
-
-
 
 async def _process_url_content(content: Content, content_id: str) -> list[Result]:
     """Direct URL processing"""
@@ -95,10 +98,10 @@ async def _process_url_content(content: Content, content_id: str) -> list[Result
         return [Result(
             content_id=str(content.id),
             detection_type="fake_news",
-            is_fake=analysis["is_fake"],
-            confidence=analysis["confidence"],
-            explanation=f"URL analysis: {str(analysis.get('details', ''))}",
-            model_used=f"URL+{analysis['model_used']}",
+            is_fake=analysis["is_fake"] < 0.2,
+            confidence=analysis["credibility_score"],
+            explanation=f"URL analysis: {str(analysis.get('classification', ''))}",
+            model_used=f"URL+{analysis['model_information']['models_used']}",
             model_version="1.0"
         )]
     except Exception as e:
