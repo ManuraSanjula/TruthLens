@@ -6,7 +6,7 @@ from tf_keras.models import load_model
 print(f"TensorFlow version: {tf.__version__}")
 
 # Set paths
-MODEL_CACHE_PATH = "model_cache"
+MODEL_CACHE_PATH = "../../model_cache"
 os.makedirs(MODEL_CACHE_PATH, exist_ok=True)
 model_path = os.path.join(MODEL_CACHE_PATH, "deepfake_model.h5")
 

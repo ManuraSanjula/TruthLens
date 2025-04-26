@@ -2,7 +2,7 @@ import tensorflow as tf
 import os
 
 # Set the path directly
-MODEL_CACHE_PATH = "model_cache"  # Update this to match your settings.MODEL_CACHE_PATH
+MODEL_CACHE_PATH = "../../model_cache"  # Update this to match your settings.MODEL_CACHE_PATH
 os.makedirs(MODEL_CACHE_PATH, exist_ok=True)
 
 # Define the model path

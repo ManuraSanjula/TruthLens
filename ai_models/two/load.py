@@ -3,7 +3,7 @@ import numpy as np
 import os
 from tf_keras.models import load_model
 
-MODEL_CACHE_PATH = "model_cache"
+MODEL_CACHE_PATH = "../../model_cache"
 
 
 def _load_model(self):

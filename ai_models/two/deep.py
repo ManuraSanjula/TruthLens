@@ -3,7 +3,7 @@ import tensorflow_hub as hub
 import os
 
 # Assuming settings is not available in this file, let's set the path directly
-MODEL_CACHE_PATH = "model_cache"  # Update this to match your settings.MODEL_CACHE_PATH
+MODEL_CACHE_PATH = "../../model_cache"  # Update this to match your settings.MODEL_CACHE_PATH
 os.makedirs(MODEL_CACHE_PATH, exist_ok=True)
 
 # Define the model path

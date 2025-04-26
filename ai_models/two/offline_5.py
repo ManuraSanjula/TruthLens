@@ -31,7 +31,7 @@ print(f"TensorFlow version: {tf.__version__}")
 print(f"Keras version: {tf.keras.__version__}")
 
 # Set paths - use ASCII-only paths to avoid encoding issues
-MODEL_CACHE_PATH = "model_cache"
+MODEL_CACHE_PATH = "../../model_cache"
 os.makedirs(MODEL_CACHE_PATH, exist_ok=True)
 
 

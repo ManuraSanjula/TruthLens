@@ -2,7 +2,7 @@ import tensorflow as tf
 import os
 
 # Set paths
-MODEL_CACHE_PATH = "model_cache"
+MODEL_CACHE_PATH = "../../model_cache"
 os.makedirs(MODEL_CACHE_PATH, exist_ok=True)
 model_path = os.path.join(MODEL_CACHE_PATH, "deepfake_model.h5")
 

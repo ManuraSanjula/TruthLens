@@ -9,7 +9,7 @@ logging.basicConfig(level=logging.INFO,
 logger = logging.getLogger(__name__)
 
 # Define paths
-MODEL_CACHE_PATH = "model_cache"
+MODEL_CACHE_PATH = "../../model_cache"
 os.makedirs(MODEL_CACHE_PATH, exist_ok=True)
 
 
